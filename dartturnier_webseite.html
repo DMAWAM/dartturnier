@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gümmi Masters 2025</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <style>
+    #progress-bar {
+      height: 4px;
+      background-color: #22c55e;
+      width: 0%;
+      transition: width 0.1s linear;
+    }
+    table {
+      border-collapse: collapse;
+    }
+    table th, table td {
+      padding: 0.4rem 0.6rem;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .rang-1 {
+      background-color: #d1fae5;
+      font-weight: bold;
+    }
+    .rang-2 {
+      background-color: #fef9c3;
+      font-weight: bold;
+    }
+      .aktuelles-spiel {
+      background-color: #bfdbfe;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body class="bg-black text-[#1d1b39] bg-cover bg-center min-h-screen" style="background-image: url('hintergrund.jpg');">
+  <div class="max-w-6xl mx-auto py-8 px-4">
+    <h1 class="text-4xl font-extrabold text-center text-white drop-shadow-lg mb-4">🎯 Gümmi Masters 2025 Gruppenphase – LIVE</h1>
+    <div class="w-full max-w-7xl h-1 bg-gray-300 rounded mb-8 overflow-hidden">
+      <div id="progress-bar"></div>
+    </div>
+    <div id="gruppen-anzeige" class="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-7xl">
+      <!-- Zwei Gruppen werden hier im Wechsel angezeigt -->
+    </div>
+  </div>
+
+  <script>
+    const baseUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRVe2rdNxp-XODdlZwve8F_wTjiNkmaJS5zXKQ6jvjqCK43YoSoFk_MgLj7wirz1Jk2wYrc1WUBbzOG/pub?gid=1271003612&single=true&output=csv';
+    let gruppenReihenfolge = ['Gruppe A', 'Gruppe B', 'Gruppe C', 'Gruppe D', 'Gruppe E', 'Gruppe F', 'Gruppe G', 'Gruppe H'];
+    let alleGruppenDaten = {};
+    let aktuellesPaar = 0;
+    let fortschritt = 0;
+
+    async function ladeDaten() {
+      const csvUrl = baseUrl + `&cachebust=${Date.now()}`;
+      const res = await fetch(csvUrl);
+      const text = await res.text();
+      const zeilen = text.trim().split('\n').map(z => z.split(',').map(e => e.trim()));
+      const daten = zeilen.slice(1).filter(z => z.length >= 5 && z[0] && z[1] && z[2] && z[3]);
+
+      const gruppen = {};
+      daten.forEach(([gruppe, spielNr, s1, s2, ergebnis]) => {
+        if (!gruppen[gruppe]) gruppen[gruppe] = [];
+        gruppen[gruppe].push({ spielNr, s1, s2, ergebnis });
+      });
+
+      alleGruppenDaten = gruppen;
+      zeigeAktuelleGruppen();
+    }
+
+    function zeigeAktuelleGruppen() {
+      const container = document.getElementById("gruppen-anzeige");
+      container.innerHTML = "";
+
+      const start = (aktuellesPaar * 2) % gruppenReihenfolge.length;
+      const aktiveGruppen = gruppenReihenfolge.slice(start, start + 2);
+
+      aktiveGruppen.forEach(gruppe => {
+        const spiele = alleGruppenDaten[gruppe];
+        if (!spiele) return;
+
+        const punkte = {};
+
+        spiele.forEach(({ s1, s2, ergebnis }) => {
+          if (!punkte[s1]) punkte[s1] = { name: s1, spiele: 0, punkte: 0 };
+          if (!punkte[s2]) punkte[s2] = { name: s2, spiele: 0, punkte: 0 };
+          if (!ergebnis.includes(':')) return;
+
+          const [r1, r2] = ergebnis.split(':').map(Number);
+          if (isNaN(r1) || isNaN(r2)) return;
+
+          punkte[s1].spiele++;
+          punkte[s2].spiele++;
+
+          if (r1 > r2) {
+            punkte[s1].punkte += 3;
+          } else if (r1 < r2) {
+            punkte[s2].punkte += 3;
+          } else {
+            punkte[s1].punkte += 1;
+            punkte[s2].punkte += 1;
+          }
+        });
+
+        const rangliste = Object.values(punkte).sort((a, b) => b.punkte - a.punkte);
+        const firstUnplayed = spiele.find(s => !s.ergebnis);
+        const gruppenHTML = `
+          <div class="bg-white text-[#1d1b39] rounded-2xl shadow p-4 w-full">
+            <h2 class="text-2xl font-bold text-center text-[#1d1b39] mb-4">${gruppe}</h2>
+            <table class="w-full text-xs mb-4">
+              <thead class="bg-gray-200"><tr><th class="text-left">Spiel</th><th class="text-left">Begegnung</th><th class="text-left">Ergebnis</th></tr></thead>
+              <tbody>
+                ${spiele.map(s => `<tr class="${s === firstUnplayed ? 'aktuelles-spiel' : ''}"><td>${s.spielNr}</td><td>${s.s1} vs ${s.s2}</td><td>${s.ergebnis || '-'}</td></tr>`).join('')}
+              </tbody>
+            </table>
+            <h3 class="font-semibold mt-2 mb-1">🏆 Rangliste</h3>
+            <table class="w-full text-xs">
+              <thead class="bg-gray-200"><tr><th class="text-left">Pl</th><th class="text-left">Spieler</th><th class="text-left">Spiele</th><th class="text-left">Punkte</th></tr></thead>
+              <tbody>
+                ${rangliste.map((p, i) => `<tr class="${i === 0 ? 'rang-1' : i === 1 ? 'rang-2' : ''}"><td>${i + 1}</td><td>${p.name}</td><td>${p.spiele}</td><td>${p.punkte}</td></tr>`).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+        container.innerHTML += gruppenHTML;
+      });
+
+      aktuellesPaar = (aktuellesPaar + 1) % (gruppenReihenfolge.length / 2);
+      fortschritt = 0;
+    }
+
+    function updateProgressBar() {
+      fortschritt += 1;
+      const bar = document.getElementById("progress-bar");
+      bar.style.width = `${(fortschritt / 100) * 100}%`;
+      if (fortschritt >= 100) fortschritt = 0;
+    }
+
+    ladeDaten();
+    setInterval(() => {
+      zeigeAktuelleGruppen();
+    }, 10000);
+    setInterval(() => {
+      ladeDaten();
+    }, 60000);
+    setInterval(updateProgressBar, 100);
+  </script>
+</body>
+</html>
